@@ -1001,6 +1001,64 @@ def updateDB2(psID, psUpdateLst):
     finally:
         session.end_session()
 
+def applicationStatusForEmail(leaveContent, finalapprover):
+
+    Approval_Status_str = ["", "", ""]
+
+    # Situation 1 : approver 1 approved with date, and the status is not rejected = approver 1 approved
+    if (len(leaveContent[0]["approval"].get("approval_date1")) > 0) and (leaveContent[0]["applicationStatus"] != "REJECTED"):
+        Approval_Status_str[0] = getStaffRecord(leaveContent[0]["approval"].get("approver1"))['staff']["name"] + " : " + "Approved" + "\n"
+        if finalapprover == 2:
+            Approval_Status_str[1] = getStaffRecord(leaveContent[0]["approval"].get("approver2"))['staff']["name"] + " : " + "Pending" + "\n"
+        if finalapprover == 3:
+            Approval_Status_str[1] = getStaffRecord(leaveContent[0]["approval"].get("approver2"))['staff']["name"] + " : " + "Pending" + "\n"
+            Approval_Status_str[2] = getStaffRecord(leaveContent[0]["approval"].get("approver3"))['staff']["name"] + " : " + "Pending" + "\n"
+    # Situation 2 : approver 2 approved with date, and the status is not rejected = approver 2 approved
+    if (len(leaveContent[0]["approval"].get("approval_date2")) > 0) and (leaveContent[0]["applicationStatus"] != "REJECTED"):
+        Approval_Status_str[0] = getStaffRecord(leaveContent[0]["approval"].get("approver1"))['staff']["name"] + " : " + "Approved" + "\n"
+        if finalapprover == 2:
+            Approval_Status_str[1] = getStaffRecord(leaveContent[0]["approval"].get("approver2"))['staff']["name"] + " : " + "Approved" + "\n"
+        if finalapprover == 3:
+            Approval_Status_str[1] = getStaffRecord(leaveContent[0]["approval"].get("approver2"))['staff']["name"] + " : " + "Approved" + "\n"
+            Approval_Status_str[2] = getStaffRecord(leaveContent[0]["approval"].get("approver3"))['staff']["name"] + " : " + "Pending" + "\n"
+    # Situation 3 : approver 3 approved with date, and the status is not rejected = approver 3 approved
+    if (len(leaveContent[0]["approval"].get("approval_date3")) > 0) and (leaveContent[0]["applicationStatus"] != "REJECTED"):
+        Approval_Status_str[0] = getStaffRecord(leaveContent[0]["approval"].get("approver1"))['staff']["name"] + " : " + "Approved" + "\n"
+        if finalapprover == 2:
+            Approval_Status_str[1] = getStaffRecord(leaveContent[0]["approval"].get("approver2"))['staff']["name"] + " : " + "Approved" + "\n"
+        if finalapprover == 3: 
+            Approval_Status_str[1] = getStaffRecord(leaveContent[0]["approval"].get("approver2"))['staff']["name"] + " : " + "Approved" + "\n"
+            Approval_Status_str[2] = getStaffRecord(leaveContent[0]["approval"].get("approver3"))['staff']["name"] + " : " + "Approved" + "\n"
+    # Situation 4 : approver 1 approved with date, and the status is rejected = approver 1 rejected
+    if (len(leaveContent[0]["approval"].get("approval_date1")) > 0) and (leaveContent[0]["applicationStatus"] == "REJECTED"):
+        Approval_Status_str[0] = getStaffRecord(leaveContent[0]["approval"].get("approver1"))['staff']["name"] + " : " + "Rejected" + "\n"
+        if finalapprover == 2:
+            Approval_Status_str[1] = getStaffRecord(leaveContent[0]["approval"].get("approver2"))['staff']["name"] + " : " + "-" + "\n"
+        if finalapprover == 3:
+            Approval_Status_str[1] = getStaffRecord(leaveContent[0]["approval"].get("approver2"))['staff']["name"] + " : " + "-" + "\n"
+            Approval_Status_str[2] = getStaffRecord(leaveContent[0]["approval"].get("approver3"))['staff']["name"] + " : " + "-" + "\n"  
+    # Situation 5 : approver 2 approved with date, and the status is rejected = approver 2 rejected 
+    if (len(leaveContent[0]["approval"].get("approval_date2")) > 0) and (leaveContent[0]["applicationStatus"] == "REJECTED"):
+        Approval_Status_str[0] = getStaffRecord(leaveContent[0]["approval"].get("approver1"))['staff']["name"] + " : " + "Approved" + "\n"
+        if finalapprover == 2:
+            Approval_Status_str[1] = getStaffRecord(leaveContent[0]["approval"].get("approver2"))['staff']["name"] + " : " + "Rejected" + "\n"
+        if finalapprover == 3:
+            Approval_Status_str[1] = getStaffRecord(leaveContent[0]["approval"].get("approver2"))['staff']["name"] + " : " + "Rejected" + "\n"
+            Approval_Status_str[2] = getStaffRecord(leaveContent[0]["approval"].get("approver3"))['staff']["name"] + " : " + "-" + "\n"     
+    # Situation 6 : approver 3 approved with date, and the status is rejected = approver 3 rejected 
+    if (len(leaveContent[0]["approval"].get("approval_date3")) > 0) and (leaveContent[0]["applicationStatus"] == "REJECTED"):
+        Approval_Status_str[0] = getStaffRecord(leaveContent[0]["approval"].get("approver1"))['staff']["name"] + " : " + "Approved" + "\n"
+        if finalapprover == 2:
+            Approval_Status_str[1] = getStaffRecord(leaveContent[0]["approval"].get("approver2"))['staff']["name"] + " : " + "Approved" + "\n"
+        if finalapprover == 3:
+            Approval_Status_str[1] = getStaffRecord(leaveContent[0]["approval"].get("approver2"))['staff']["name"] + " : " + "Approved" + "\n"
+            Approval_Status_str[2] = getStaffRecord(leaveContent[0]["approval"].get("approver3"))['staff']["name"] + " : " + "Rejected" + "\n"     
+
+    Approval_Status = Approval_Status_str[0] + Approval_Status_str[1] + Approval_Status_str[2]
+
+    return Approval_Status
+
+
 def checkSSL(host,port,timeout=1):
     sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM) #presumably 
     sock.settimeout(timeout)
@@ -1013,7 +1071,7 @@ def checkSSL(host,port,timeout=1):
        return 250
 
 
-def Mailer_to_Go(message, sendTo, sendCC):
+def Mailer_to_Go(message, title, sendTo, sendCC):
 
 
     # sender
@@ -1049,7 +1107,7 @@ def Mailer_to_Go(message, sendTo, sendCC):
         recipient_cc_email = sendCC
 
     # subject
-    subject = "Eleave System Notification"
+    subject = title
 
     # text body
     body_plain = message
@@ -1124,7 +1182,7 @@ def sendEmail(psRecord, psRefNo, psApprovalStatus, psAction, psRequest, finalapp
     leaveContent = list(filter(lambda r: (r["ref_no"] == psRefNo), psRecord["leave_record"]))
     leavePeriod = ""
     for leaveitem in leaveContent[0]["details"]:
-        leavePeriod = leavePeriod + leaveitem.get("start_date") + " " + leaveitem.get("start_time") + " " + leaveitem.get("end_date") + " " + leaveitem.get("end_time") + "\n"
+        leavePeriod = leavePeriod + leaveitem.get("start_date") + " " + leaveitem.get("start_time") + " to " + leaveitem.get("end_date") + " " + leaveitem.get("end_time") + "\n"
 
     
     # Make email list for sending out to specific recipient by defined cc_general in MongoDB
@@ -1143,131 +1201,133 @@ def sendEmail(psRecord, psRefNo, psApprovalStatus, psAction, psRequest, finalapp
             sickleave_count = 0
 
     if (int(sickleave_count) >= 2):
-        # Make email list for sending out to specific recipient by defined cc_sl2days in MongoDB
-        cc_sl2days = str(psRecord["staff"]["cc_sl2days"]).replace(",", ";")
-        cc_sl2days = cc_sl2days.split(";")
-        for index, recipient in enumerate(cc_sl2days):
-            cc_sl2days[index] = getStaffRecord(recipient.strip())['staff']["email"]
-        cc_sl2days_list = ';'.join(map(str, cc_sl2days))
+        # Make email list for sending out to specific recipient by defined cc_sl_limit in MongoDB
+        cc_sl_limit = str(psRecord["staff"]["cc_sl_limit"]).replace(",", ";")
+        cc_sl_limit = cc_sl_limit.split(";")
+        for index, recipient in enumerate(cc_sl_limit):
+            cc_sl_limit[index] = getStaffRecord(recipient.strip())['staff']["email"]
+        cc_sl_limit_list = ';'.join(map(str, cc_sl_limit))
     else:
-        cc_sl2days_list = ""
+        cc_sl_limit_list = ""
 
-    type = ((list(filter(lambda r: (r["leave_type_id"].upper() == leaveContent[0].get("type")), leaveTypeLst))[0]).get("leave_type")) 
+    # Manual make type caption
+    if leaveContent[0]["type"] == "LVE01": typename = "ANNUAL leave"
+    elif leaveContent[0]["type"] == "LVE02": typename = "CASUAL leave"
+    elif leaveContent[0]["type"] == "LVE03": typename = "WFH"
+    elif leaveContent[0]["type"] in ["LVE04","LVE05"]: typename = "SICK leave"
 
-    if psRequest == df['gcActionApply'][0] and psAction == df['gcActionApply'][0]:
-        sendTo = psRecord["staff"]["email"]
-        sendCC = cc_general_list + ";" + cc_sl2days_list
-        applicant = psRecord["staff"]["name"]
-        message =  '"' + type + '"' + " Ref no. : " + getDisplayRefNo (leaveContent[0].get("ref_no"), psRecord["staff"]["hr_office"], psRecord["staff"]["racf"]) + "\nYour application has been submitted for approval.\n\n Leave Period:\n" + leavePeriod
-        try:
-            Mailer_to_Go(message, sendTo, sendCC)
-        except:
-            pass
-    elif psRequest == df['gcActionCancel'][0] and psAction == df['gcActionCancel'][0]:
-        sendTo = psRecord["staff"]["email"]
-        sendCC = cc_general_list + ";" + cc_sl2days_list
-        applicant = psRecord["staff"]["name"]
-        message =  '"' + type + '"' + " Ref no. : " + getDisplayRefNo (leaveContent[0].get("ref_no"), psRecord["staff"]["hr_office"], psRecord["staff"]["racf"]) + "\nYour cancellation request has been submitted for approval. \n\n LeavePeriod:\n " + leavePeriod
-        try:
-            Mailer_to_Go(message, sendTo, sendCC)
-        except:
-            pass               
-    if psApprovalStatus == df['gcStatusPending1'][0]:
+    # Manual make current approver
+    if currentapprover == 1 and finalapprover != 1: 
+        current_approver = getStaffRecord(leaveContent[0]["approval"].get("approver1"))['staff']["email"]
+        next_approver = getStaffRecord(leaveContent[0]["approval"].get("approver2"))['staff']["email"]
+    elif currentapprover == 1 and finalapprover == 1: 
+        current_approver = getStaffRecord(leaveContent[0]["approval"].get("approver1"))['staff']["email"]
+        next_approver = ""
+    elif currentapprover == 2 and finalapprover == 3 : 
+        current_approver = getStaffRecord(leaveContent[0]["approval"].get("approver2"))['staff']["email"]
+        next_approver = getStaffRecord(leaveContent[0]["approval"].get("approver3"))['staff']["email"]
+    elif currentapprover == 2 and finalapprover == 2 : 
+        current_approver = getStaffRecord(leaveContent[0]["approval"].get("approver2"))['staff']["email"]
+        next_approver = ""
+    elif currentapprover == 3 : 
+        current_approver = getStaffRecord(leaveContent[0]["approval"].get("approver3"))['staff']["email"]
+
+    # Manual make reference number in HR format i.e. REG2022001KWY
+    ref_no_hr = str(psRecord["staff"]["hr_office"]) + str(psRefNo) + str(psRecord["staff"]["racf"][-3:])
+
+    # Manual make application status per pending situation
+    Approval_Status = applicationStatusForEmail(leaveContent, finalapprover)
+
+    # Apply/Cancel leave must send to approver 1
+    if ((psRequest == df['gcActionApply'][0] and psAction == df['gcActionApply'][0])):
         sendTo = getStaffRecord(psRecord["staff"]["approver1"])['staff']["email"]
-        sendCc = psRecord["staff"]["email"]
-        applicant = psRecord["staff"]["name"]
-        message =  '"' + type + '"' + " Ref no. : " + getDisplayRefNo (leaveContent[0].get("ref_no"), psRecord["staff"]["hr_office"], psRecord["staff"]["racf"]) + " for " + applicant + " is waiting for your approval. \n\n  Leave Period:\n" + leavePeriod + "\n Link to Approval Center : https://mmgeleave.herokuapp.com/#/ApprovalCenter"
+        sendCc = psRecord["staff"]["email"] + ";" + cc_general_list + ";" + cc_sl_limit_list
+        title = "e-Leave alert : " + str(psRecord["staff"]["name"]) + " is requesting your APPROVAL to apply " + str(typename) + " (" + "Reference# : " + str(ref_no_hr) + ")"
+        message = "Dear People Leader," + "\n" + "\n"  + "Please click the following link to approve:  https://mmgeleave.herokuapp.com/#/ApprovalCenter" + "\n" + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
         try:
-            Mailer_to_Go(message, sendTo, sendCc)
+            Mailer_to_Go(message, title, sendTo, sendCc)
         except:
             pass
-    elif psApprovalStatus == df['gcStatusPending2'][0]:
-        sendTo = getStaffRecord(psRecord["staff"]["approver2"])['staff']["email"]
-        sendCc = psRecord["staff"]["email"]
-        applicant = psRecord["staff"]["name"]
-        message =  '"' + type + '"' + " Ref no. : " + getDisplayRefNo (leaveContent[0].get("ref_no"), psRecord["staff"]["hr_office"], psRecord["staff"]["racf"]) +  " for " + applicant + " is waiting for your approval. \n\n  Leave Period:\n" + leavePeriod + "\n Link to Approval Center : https://mmgeleave.herokuapp.com/#/ApprovalCenter"
-        try:
-            Mailer_to_Go(message, sendTo, sendCc)
-        except:
-            pass
-    elif psApprovalStatus == df['gcStatusPending3'][0]:
-        sendTo = getStaffRecord(psRecord["staff"]["approver3"])['staff']["email"]
-        sendCc = psRecord["staff"]["email"]
-        applicant = psRecord["staff"]["name"]
-        message =  '"' + type + '"' + " Ref no. : " + getDisplayRefNo (leaveContent[0].get("ref_no"), psRecord["staff"]["hr_office"], psRecord["staff"]["racf"]) + " for " + applicant + " is waiting for your approval. \n\n  Leave Period:\n" + leavePeriod + "\n Link to Approval Center : https://mmgeleave.herokuapp.com/#/ApprovalCenter"
-        try:
-            Mailer_to_Go(message, sendTo, sendCc)
-        except:
-            pass     
-    elif psApprovalStatus == df['gcStatusPendingCancel1'][0]:
+    elif (psRequest == df['gcActionCancel'][0]) and (psAction == df['gcActionCancel'][0]):
         sendTo = getStaffRecord(psRecord["staff"]["approver1"])['staff']["email"]
+        sendCc = psRecord["staff"]["email"] + ";" + cc_general_list + ";" + cc_sl_limit_list
+        title = "e-Leave alert : " + str(psRecord["staff"]["name"]) + " is requesting your APPROVAL to cancel " + str(typename) + " (" + "Reference# : " + str(ref_no_hr) + ")"
+        message = "Dear People Leader," + "\n" + "\n"  + "Please click the following link to approve:  https://mmgeleave.herokuapp.com/#/ApprovalCenter" + "\n" + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
+        try:
+            Mailer_to_Go(message, title, sendTo, sendCc)
+        except:
+            pass        
+    # Approved by approver must send to applicant and next approver , if it is final approver, it will send out the sick leave limit list to HR
+    if psAction == df['gcActionApprove'][0] and psRequest == df['gcActionApply'][0]:
+        sendTo = psRecord["staff"]["email"]
+        if finalapprover == currentapprover:
+            sendCc = current_approver + ";" + cc_general_list + ";" + cc_sl_limit_list
+            title = "e-Leave alert : " + "Your leave application on " + str(typename) + " is updated with a status of Approved" + " (" + "Reference# : " + str(ref_no_hr) + ")"
+            message = "Dear Applicant, " + "\n" + "\n"  + "Approval Status :" + "\n" + Approval_Status  + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
+            try:
+                Mailer_to_Go(message, title, sendTo, sendCc)
+            except:
+                pass
+        elif finalapprover > currentapprover:
+            sendCc = current_approver + ";"
+            title = "e-Leave alert : " + "Your leave application on " + str(typename) + " is updated with a status of Pending for Approval" + " (" + "Reference# : " + str(ref_no_hr) + ")"
+            message = "Dear Applicant, " + "\n" + "\n"  + "Approval Status :" + "\n" + Approval_Status + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
+            try:
+                Mailer_to_Go(message, title, sendTo, sendCc)
+            except:
+                pass
+    # Reject end instantly
+    if psAction == df['gcActionReject'][0] and (psRequest == df['gcActionApply'][0] or psRequest == df['gcActionCancel'][0]):
+        sendTo = psRecord["staff"]["email"]
+        sendCc = current_approver + ";" + cc_general_list + ";" + cc_sl_limit_list 
+        title = "e-Leave alert : " + "Your leave application on " + str(typename) + " is updated with a status of Rejected" + " (" + "Reference# : " + str(ref_no_hr) + ")"
+        message = "Dear Applicant, " + "\n" + "\n"  + "Approval Status :" + "\n" + Approval_Status + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
+        try:
+            Mailer_to_Go(message, title, sendTo, sendCc)
+        except:
+            pass 
+    # Approved by approver must send to applicant and next approver , if it is final approver, it will send out the sick leave limit list to HR
+    if psAction == df['gcActionApprove'][0] and psRequest == df['gcActionCancel'][0]:
+        sendTo = psRecord["staff"]["email"]
+        if finalapprover == currentapprover:
+            sendCc = current_approver + ";" + cc_general_list + ";" + cc_sl_limit_list
+            title = "e-Leave alert : " + "Your leave application on " + str(typename) + " is updated with a status of Cancelled" + " (" + "Reference# : " + str(ref_no_hr) + ")"
+            message = "Dear Applicant, " + "\n" + "\n"  + "Cancel Approval Status :" + "\n" + Approval_Status + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
+            try:
+                Mailer_to_Go(message, title, sendTo, sendCc)
+            except:
+                pass
+        elif finalapprover > currentapprover:
+            sendCc = current_approver + ";" + cc_general_list + ";" + cc_sl_limit_list
+            title = "e-Leave alert : " + "Your leave application on " + str(typename) + " is updated with a status of Pending for Approval" + " (" + "Reference# : " + str(ref_no_hr) + ")"
+            message = "Dear Applicant, " + "\n" + "\n"  + "Cancel Approval Status :" + "\n" + Approval_Status + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
+            try:
+                Mailer_to_Go(message, title, sendTo, sendCc)
+            except:
+                pass
+    # Send pending leave to next approver
+    if (finalapprover > currentapprover) and (psAction == df['gcActionApprove'][0] and psRequest == df['gcActionCancel'][0]):
+        sendTo = next_approver
+        sendCc = psRecord["staff"]["email"] + ";" + cc_general_list + ";" + cc_sl_limit_list
+        title = "e-Leave alert : " + str(psRecord["staff"]["name"]) + " is requesting your APPROVAL to cancel " + str(typename) + " (" + "Reference# : " + str(ref_no_hr) + ")"
+        message = "Dear People Leader," + "\n" + "\n"  + "Please click the following link to approve:  https://mmgeleave.herokuapp.com/#/ApprovalCenter" + "\n" + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
+        try:
+            Mailer_to_Go(message, title, sendTo, sendCc)
+        except:
+            pass
+    # Send pending leave to next approver
+    if (finalapprover > currentapprover) and (psAction == df['gcActionApprove'][0] and psRequest == df['gcActionApply'][0]):
+        sendTo = next_approver
         sendCc = psRecord["staff"]["email"]
-        applicant = psRecord["staff"]["name"]
-        message =  '"' + type + '"' + " Ref no. : " + getDisplayRefNo (leaveContent[0].get("ref_no"), psRecord["staff"]["hr_office"], psRecord["staff"]["racf"]) + " for " + applicant + " is waiting for your approval. \n\n  Leave Period:\n" + leavePeriod + "\n Link to Approval Center : https://mmgeleave.herokuapp.com/#/ApprovalCenter"
+        title = "e-Leave alert : " + str(psRecord["staff"]["name"]) + " is requesting your APPROVAL to apply " + str(typename) + " (" + "Reference# : " + str(ref_no_hr) + ")"
+        message = "Dear People Leader," + "\n" + "\n"  + "Please click the following link to approve:  https://mmgeleave.herokuapp.com/#/ApprovalCenter" + "\n" + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
         try:
-            Mailer_to_Go(message, sendTo, sendCc)
+            Mailer_to_Go(message, title, sendTo, sendCc)
         except:
             pass
-    elif psApprovalStatus == df['gcStatusPending2'][0]:
-        sendTo = getStaffRecord(psRecord["staff"]["approver2"])['staff']["email"]
-        sendCc = psRecord["staff"]["email"]
-        applicant = psRecord["staff"]["name"]
-        message =  '"' + type + '"' + " Ref no. : " + getDisplayRefNo (leaveContent[0].get("ref_no"), psRecord["staff"]["hr_office"], psRecord["staff"]["racf"]) + " for " + applicant + " is waiting for your approval. \n\n  Leave Period:\n" + leavePeriod + "\n Link to Approval Center : https://mmgeleave.herokuapp.com/#/ApprovalCenter"
-        try:
-            Mailer_to_Go(message, sendTo, sendCc)
-        except:
-            pass
-    elif psApprovalStatus == df['gcStatusPending3'][0]:
-        sendTo = getStaffRecord(psRecord["staff"]["approver3"])['staff']["email"]
-        sendCc = psRecord["staff"]["email"]
-        applicant = psRecord["staff"]["name"]
-        message =  '"' + type + '"' + " Ref no. : " +getDisplayRefNo (leaveContent[0].get("ref_no"), psRecord["staff"]["hr_office"], psRecord["staff"]["racf"]) + " for " + applicant + " is waiting for your approval. \n\n  Leave Period:\n" + leavePeriod + "\n Link to Approval Center : https://mmgeleave.herokuapp.com/#/ApprovalCenter"
-        try:
-            Mailer_to_Go(message, sendTo, sendCc)
-        except:
-            pass
-    elif psAction == df['gcActionApprove'][0] and psRequest == df['gcActionApply'][0]:
-        sendTo = psRecord["staff"]["email"]
-        if currentapprover == finalapprover:
-            sendCc = cc_general_list + ";" + cc_sl2days_list
-        else:
-            sendCc = ""
-        applicant = psRecord["staff"]["name"]
-        message =   '"' + type + '"' + " Ref no. : " + getDisplayRefNo (leaveContent[0].get("ref_no"), psRecord["staff"]["hr_office"], psRecord["staff"]["racf"]) + "\nYour application has been approved.\n\n Leave Period:\n" + leavePeriod
-        try:
-            Mailer_to_Go(message, sendTo, sendCc)
-        except:
-            pass
-    elif psAction == df['gcActionReject'][0] and psRequest == df['gcActionApply'][0]:
-        sendTo = psRecord["staff"]["email"]
-        sendCc = cc_general_list + ";" + cc_sl2days_list
-        applicant = psRecord["staff"]["name"]
-        message =   '"' + type + '"' + " Ref no. : " + getDisplayRefNo (leaveContent[0].get("ref_no"), psRecord["staff"]["hr_office"], psRecord["staff"]["racf"]) + "\nYour application has been rejected.\n\n Leave Period:\n" + leavePeriod
-        try:
-            Mailer_to_Go(message, sendTo, sendCc)
-        except:
-            pass
-    elif psAction== df['gcActionApprove'][0] and psRequest == df['gcActionCancel'][0]:
-        sendTo = psRecord["staff"]["email"]
-        if currentapprover == finalapprover:
-            sendCc = cc_general_list + ";" + cc_sl2days_list
-        else:
-            sendCc = ""
-        applicant = psRecord["staff"]["name"]
-        message =   '"' + type + '"' + " Ref no. : " + getDisplayRefNo (leaveContent[0].get("ref_no"), psRecord["staff"]["hr_office"], psRecord["staff"]["racf"]) + "\nYour cancellation request has been approved.\n\n Leave Period:\n" + leavePeriod
-        try:
-            Mailer_to_Go(message, sendTo, sendCc)
-        except:
-            pass
-    elif psAction == df['gcActionReject'][0] and psRequest == df['gcActionCancel'][0]:
-        sendTo = psRecord["staff"]["email"]
-        sendCc = cc_general_list + ";" + cc_sl2days_list
-        applicant = psRecord["staff"]["name"]
-        message =   '"' + type + '"' + " Ref no. : " + getDisplayRefNo (leaveContent[0].get("ref_no"), psRecord["staff"]["hr_office"], psRecord["staff"]["racf"]) + "\nYour cancellation request has been rejected.\n\n Leave Period:\n" + leavePeriod
-        try:
-            Mailer_to_Go(message, sendTo, sendCc)
-        except:
-            pass
+
+
+    
     
 # function to apply leave
 # parameters:
@@ -1800,11 +1860,32 @@ def changeStatus(psInput):
     date_input = datetime.strptime(psInput['localTime'], '%a %b %d %Y')
     new_date = date_input.strftime('%Y-%m-%d')
 
-    updateApproval = {
-        "field": "leave_record." + str(index) + ".approval" + ".approval_date" + str(approval_index),
-        "value":  new_date
-    }
-    updateApprovalLst.append(updateApproval)
+    # Action Cancel to clean up all approval date
+    if psAction != df['gcActionCancel'][0]:
+        updateApproval = {
+            "field": "leave_record." + str(index) + ".approval" + ".approval_date" + str(approval_index),
+            "value":  new_date
+             }
+        updateApprovalLst.append(updateApproval)
+    elif psAction == df['gcActionCancel'][0]:
+        for m in range(1 , 4):
+            updateApproval = {
+                "field": "leave_record." + str(index) + ".approval" + ".approval_date" + str(m),
+                "value":  ""
+                }
+            updateApprovalLst.append(updateApproval)
+            updateApproval = {
+                "field": "leave_record." + str(index) + ".approval" + ".approver1",
+                "value": staffRecord["staff"]["approver1"]
+                }
+            updateApproval = {
+                "field": "leave_record." + str(index) + ".approval" + ".approver2",
+                "value": staffRecord["staff"]["approver2"]
+                }
+            updateApproval = {
+                "field": "leave_record." + str(index) + ".approval" + ".approver3",
+                "value": staffRecord["staff"]["approver3"]
+                }
 
     # Update approver record data in MongoDB
     approval_result = updateDB2(id, updateApprovalLst)
@@ -1907,7 +1988,7 @@ def apiListLeave():
 
 
 # Status_code 200: passed
-# Status_code 51: Fail to generate Leave Summary
+# Status_code 501: Fail to generate Leave Summary
 
 @eleave.route("/api/printsummary", methods=['POST'])
 @checkLogged.check_logged
@@ -2027,20 +2108,6 @@ def apiPrintApply():
 
     # Get Staff record for output
     StaffRecord = getStaffRecord(racf)
-
-    # Approver 
-    if len(StaffRecord['staff']['approver1']) > 1:
-        approver1 = getStaffRecord(StaffRecord['staff']['approver1'])['staff']['name']
-    else:
-        approver1 = ""
-    if len(StaffRecord['staff']['approver2']) > 1:
-        approver2 = getStaffRecord(StaffRecord['staff']['approver2'])['staff']['name']
-    else:
-        approver2 = ""
-    if len(StaffRecord['staff']['approver3']) > 1:
-        approver3 = getStaffRecord(StaffRecord['staff']['approver3'])['staff']['name']
-    else:
-        approver3 = ""
 
     # Find leave list by racf and ref
     ref_no = ref.replace(StaffRecord['staff']['hr_office'],"") # remove hr office in reference no
@@ -2191,7 +2258,89 @@ def apiPrintApply():
 
     return send_file(out,  attachment_filename='a_file.xls', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
-         
+
+def listPartnersLeave(psInput):
+
+    getLeaveTypes()
+
+    psUser = psInput.get("racf", "")
+
+    # Get Year
+    try:
+        years = (json.loads(current_app.config['YEARS'])).get('year')
+    except:
+        years_str = os.environ['YEARS']      
+        years = eval(years_str)
+        years = pd.DataFrame(data=years)
+        years = years['year'].tolist()
+
+    # Get date
+    date_input = datetime.strptime(psInput['localTime'], '%a %b %d %Y')
+
+    staffRecord = getStaffRecord(psUser)
+    if not isinstance(staffRecord, dict):
+        return ({"pass": False, "error_message" : "Staff Record Not Exist", "result": None, "Status_code": 504}) 
+
+    if len(psUser) == 0:
+        return ({"pass": False, "error_message" : "Incorrect parameters", "result": None, "Status_code": 505})
+
+    partnersLeave = [ ]
+    staffRecord = list(eleaveDtl.find ( {"staff.racf" : { '$regex' : psUser, '$options' : "i"} , "staff.status": { '$regex': "ACTIVE", '$options': "i"} } ) )
+    partnersLeaveList = [ ]
+    for rec in staffRecord:
+        if len(rec["staff"]["partners"]) > 0 :
+            partnerslist = str(rec["staff"]["partners"]).replace(" ","")
+            partnerslist = partnerslist.split(";")
+            for partners in partnerslist:
+                partnersRecord = list(eleaveDtl.find ( {"staff.racf" : { '$regex' : partners, '$options' : "i"} , "staff.status": { '$regex': "ACTIVE", '$options': "i"} } ) )
+                for partnersrec in partnersRecord:
+                    staff = partnersrec["staff"]["name"]
+                    racf = partnersrec["staff"]["racf"]
+                    office = partnersrec["staff"]["hr_office"]
+                    leaveappliedLst = list(filter(lambda r: (r["approvalStatus"] == df['gcStatusApproved'][0]), partnersrec["leave_record"]))
+                    for record in leaveappliedLst:
+                        leaveDetailsLst = [ ]
+                        if record['year'] in years:
+                            for details in record["details"]:
+                                leaveDetails = {
+                                                "startDate": details["start_date"],
+                                                "startTime": details["start_time"],
+                                                "endDate": details["end_date"],
+                                                "endTime": details["end_time"],
+                                                "workday": details["no_of_workday"],
+                                                "calendarDay": details["no_of_calendarday"]
+                                               }
+                                if (((datetime.strptime(details["start_date"],'%Y-%m-%d').date() - date_input.date()).days) >= 0) and (((datetime.strptime(details["start_date"],'%Y-%m-%d').date() - date_input.date()).days) <= 14):
+                                    leaveDetailsLst.append(leaveDetails)
+                            leaveRecord = {
+                                          "staff": staff,
+                                          "racf": racf,
+                                          "ref_no": getDisplayRefNo(record["ref_no"], office, racf),
+                                          "type_id": record["type"],
+                                          "type": list(filter(lambda r: (r["leave_type_id"].upper() == record["type"]), leaveTypeLst))[0].get("leave_type"),
+                                          "approvalStatus": df['gcStatusApproved'][0],
+                                          "details": leaveDetailsLst
+                                          }
+                            if (((datetime.strptime(details["start_date"],'%Y-%m-%d').date() - date_input.date()).days) >= 0) and (((datetime.strptime(details["start_date"],'%Y-%m-%d').date() - date_input.date()).days) <= 14):
+                                partnersLeaveList.append(leaveRecord)
+                    partnersLeaveList = sorted(partnersLeaveList, key=lambda d: (d["approvalStatus"], d["staff"], d["racf"], d["ref_no"])) 
+            partnersLeave.append(partnersLeaveList)
+    #print (partnersLeaveList)
+    return ({"pass": True, "error_message" : None, "result": partnersLeave, "Status_code": 200}) 
+
+# Status_code 200: passed
+# Status_code 504: failed, Staff Record Not Exist
+# Status_code 505: failed, Incorrect parameters
+
+@eleave.route("/api/partnersleave", methods=['POST'])
+@checkLogged.check_logged
+def apiPartnersLeave():
+    psInput = request.get_json()
+    result = listPartnersLeave(psInput)
+    try: 
+        return jsonify(result), result['Status_code'] # APP
+    except:
+        return jsonify(result) # postman
 
 # Status_code 200: passed
 # Status_code 501: failed, Not enough days left for the leave
@@ -2246,8 +2395,8 @@ def apiListApprovedByYear():
         return jsonify(result) # postman
 
 # Status_code 200: passed
-# Status_code 505: failed, Incorrect parameters
 # Status_code 504: failed, Staff Record Not Exist
+# Status_code 505: failed, Incorrect parameters
 # Status_code 603: failed, Current Status cannot be changed
 # Status_code 604: failed, Only applicant himself / herself can cancel leave
 # Status_code 605: failed, Leave cancel already submitted and waiting for approval
