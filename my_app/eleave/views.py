@@ -11,11 +11,15 @@ from openpyxl.styles import borders
 from openpyxl.styles.borders import Border
 from openpyxl.styles.alignment import Alignment
 from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
+from email import encoders
+from base64 import encodebytes
 from copy import copy
 
 import pandas as pd
 import gridfs
+import mimetypes
 import calendar
 import smtplib
 import socket
@@ -284,8 +288,11 @@ def date2Str(psDate):
 # return:
 # staff record in MongoDB.
 def getStaffRecord (psRacf):
-    staffRecord = eleaveDtl.find_one ( {"staff.racf" : { '$regex' : psRacf, '$options' : "i"} , "staff.status": { '$regex': "ACTIVE", '$options': "i"} } )
-    return(staffRecord)
+    if len(psRacf) > 0 :
+        staffRecord = eleaveDtl.find_one ( {"staff.racf" : { '$regex' : psRacf, '$options' : "i"} , "staff.status": { '$regex': "ACTIVE", '$options': "i"} } )
+        return(staffRecord)
+    else:
+        return None
 
 def getLeaveTypes():
     global leaveTypeLst
@@ -589,42 +596,40 @@ def checkBalance(psYear, psLeaveTypeAttr, psRecord, psApplyingLeaveSlotLst):
     leaveEntitleLst = getLeaveEntitlement(psYear, psLeaveTypeAttr, psRecord)
     leaveHistoryLst = getLeaveHistory(psYear, psYear, psRecord)
     leaveHistoryLst = list(filter(lambda r: (r["applicationStatus"].upper() != df['gcStatusCancel'][0] and r["applicationStatus"].upper() != df['gcStatusReject'][0]), leaveHistoryLst))
-    beforeForfeit = 0
-    afterForfeit = 0
+    taken = 0
     
     leaveHistoryTypeLst = list(filter(lambda r: (r["type"].upper() == psLeaveTypeAttr.get("leave_type_id").upper() and r["year"] == psYear), leaveHistoryLst))
     # count no. of leave taken before and after the Carry Forward Forfeit Date
     for lve in leaveHistoryTypeLst:
-        if lve["ldate"] <= leaveEntitleLst[0]["forfeitDate"]:
-            beforeForfeit += 0.5
-        else:
-            afterForfeit += 0.5
+            taken += 0.5
+    #    else:
+    #        afterForfeit += 0.5
     
     # count no. of leave already taken + applying before and after the Carry Forward Forfeit Date 
     for apply in psApplyingLeaveSlotLst:
-        if apply["ldate"] <= leaveEntitleLst[0]["forfeitDate"]:
-            beforeForfeit += 0.5
-        else:
-            afterForfeit += 0.5
+            taken += 0.5
+    #    else:
+    #        afterForfeit += 0.5
 
     # if total leave taken + applying before the Carry Forward Forfeit Date > total leave entitlement + leave carry forward, return leave balance
-    if leaveEntitleLst[0]["leaveEntitle"] + leaveEntitleLst[0]["carryForward"] < beforeForfeit:
-        return (leaveEntitleLst[0]["leaveEntitle"] + leaveEntitleLst[0]["carryForward"] - beforeForfeit)
+    #if leaveEntitleLst[0]["leaveEntitle"] + leaveEntitleLst[0]["carryForward"] < beforeForfeit:
+    #    return (leaveEntitleLst[0]["leaveEntitle"] + leaveEntitleLst[0]["carryForward"] - beforeForfeit)
 
     # if leave remaining after the Forefeit Date >= leave entitlement, set leave entitlement after the Forfeit Date = leave entitlement
-    if leaveEntitleLst[0]["leaveEntitle"] + leaveEntitleLst[0]["carryForward"] - beforeForfeit >= leaveEntitleLst[0]["leaveEntitle"]:
-        entitleAfterForfeit = leaveEntitleLst[0]["leaveEntitle"]
+    #if leaveEntitleLst[0]["leaveEntitle"] + leaveEntitleLst[0]["carryForward"] - beforeForfeit >= leaveEntitleLst[0]["leaveEntitle"]:
+    #    entitleAfterForfeit = leaveEntitleLst[0]["leaveEntitle"]
 
     # if leave remaining after the Forefeit Date < leave entitlement, set leave entitlement after the Forfeit Date = leave remaining of that year
-    else:
-        entitleAfterForfeit = leaveEntitleLst[0]["leaveEntitle"] + leaveEntitleLst[0]["carryForward"] - beforeForfeit
+    #else:
+    #    entitleAfterForfeit = leaveEntitleLst[0]["leaveEntitle"] + leaveEntitleLst[0]["carryForward"] - beforeForfeit
     
     # if leave entitlement after the Forfeit Date < leave taken + applying after the Foefeit Date, returm leave balance
-    if entitleAfterForfeit < afterForfeit:
-        return (entitleAfterForfeit - afterForfeit)
+    #if entitleAfterForfeit < afterForfeit:
+    #    return (entitleAfterForfeit - afterForfeit)
 
     # if leave taken + applying not exceeding the leave entitlement, return leave balance
-    return (entitleAfterForfeit - afterForfeit)
+    #return (entitleAfterForfeit - afterForfeit)
+    return (leaveEntitleLst[0]["leaveEntitle"] + leaveEntitleLst[0]["carryForward"] - taken)
 
 #list all dates for a Week of Day in a specific year.
 #parameters :
@@ -802,7 +807,7 @@ def countConsecutiveDaysByType(leaveHistoryLst, ApplyLeaveLst, Type):
 # return :
 # total consecutive days or the max. consecutive days allowed + 0.5 (when the consective days exceeds the days allowed, it will stop checking and return.)
 def checkConsecutiveDays (psYear, psOffice, psRecord, psApplyingSlotLst, psLeaveTypeAttr):
-    consecutiveSlot = 0
+    consecutiveSlot = -3
     groupAttrLst = list(filter(lambda r: (r["groupID"] == psLeaveTypeAttr.get("leave_group")), leaveGroupLst))[0]
     if groupAttrLst.get("max_consecutive_days", "")  != "":
         relatedLveLst = []
@@ -837,8 +842,10 @@ def checkConsecutiveDays (psYear, psOffice, psRecord, psApplyingSlotLst, psLeave
         currTime = combinedTimeSlot[0]["ltime"]
 
         currConsecutiveDay = False
+
     
         for t in combinedTimeSlot:
+            print (str(currDate) + " / " + str(t["ldate"]) + " consecutiveSlot: " + str(consecutiveSlot))
             if currDate == t["ldate"]:
                 consecutiveSlot += 1
                 if t["ldate"] ==  psApplyingSlotLst[0]["ldate"] and currTime == psApplyingSlotLst[0]["ltime"]:
@@ -851,13 +858,18 @@ def checkConsecutiveDays (psYear, psOffice, psRecord, psApplyingSlotLst, psLeave
                 currDate = t["ldate"]
                 currTime = t["ltime"]                
             else:
-                consecutiveSlot = 1
+                consecutiveSlot = -3
+                if t["ldate"] ==  psApplyingSlotLst[0]["ldate"]:
+                    consecutiveSlot = 0
                 currDate = t["ldate"]
                 currTime = t["ltime"]
                 currConsecutiveDay = False
-            
+
             if consecutiveSlot > (groupAttrLst.get("max_consecutive_days", 0) * 2) and currConsecutiveDay:
-                return ({"pass": False, "error_message" : "Leave applied is over " + str(groupAttrLst.get("max_consecutive_days")) + " day(s)", "result": None,  "Status_code": 506})
+                if groupAttrLst.get("groupID") != 1:
+                    return ({"pass": False, "error_message" : "Reminder: For any sick leave periods that exceed 2 contiguous days, sick leave certificate is required", "result": None,  "Status_code": 506})
+                else:
+                    return ({"pass": False, "error_message" : "Reminder: Maximum vacation taken at any one time is 2 WEEKS including Public Holidays, Saturdays and Sundays", "result": None,  "Status_code": 506})
 
     else:
 
@@ -1059,6 +1071,263 @@ def applicationStatusForEmail(leaveContent, finalapprover):
     return Approval_Status
 
 
+def getSummaryForm(year, racf):                  
+    psInput =  {'year': year, 'racf': racf}    
+
+    result = listLeave(psInput)
+ 
+    rpt = reportMap.find_one ( { "report": "Leave Summary"} )
+    
+    if (result.get("pass")): 
+        hdr = result.get("result")[0]["header"]
+        alTaken = 0
+        alPending = 0
+        alBalance = 0
+        clTaken = 0
+        clPending = 0
+        clBalance = 0
+        slTaken = 0
+        slPending = 0
+        slBalance = 0
+        for lve in leaveTypeLst:
+            hdrData =  list(filter(lambda r: (r["leaveTypeId"].upper() == lve["leave_type_id"]), hdr))[0]
+            if lve["leave_type_id"] == "LVE01":
+                alTaken = hdrData["taken"]
+                alPending = hdrData["pending"]
+                alBalance = hdrData["balance"]
+            elif lve["leave_type_id"] == "LVE02":
+                clTaken = hdrData["taken"]
+                clPending = hdrData["pending"]
+                clBalance = hdrData["balance"]
+            elif lve["leave_type_id"] == "LVE04":
+                slTaken = hdrData["taken"] + slTaken
+                slPending = hdrData["pending"] + slPending
+                slBalance = hdrData["balance"] + slBalance
+            elif lve["leave_type_id"] == "LVE05":
+                slTaken = hdrData["taken"] + slTaken
+                slPending = hdrData["pending"] + slPending
+                slBalance = hdrData["balance"] + slBalance
+        rptDtlLst = [ ]                    
+        for record in result.get("result"):
+            for dtl in record["details"]:
+                rptDtl = {
+                    "submitDate": dtl.get("submitDate"),
+                    "refNo": dtl.get("refNo"),
+                    "office": dtl.get("office"),
+                    "staffname": dtl.get("staffname"),
+                    "empID": dtl.get("empID"),
+                    "dept": dtl.get("dept"),
+                    "type": dtl.get("type"),
+                    "year": dtl.get("year"),
+                    "leaveFrom": dtl.get("leaveFrom"),
+                    "startPeriod": dtl.get("startPeriod"),
+                    "leaveTo": dtl.get("leaveTo"),
+                    "endPeriod": dtl.get("endPeriod"),
+                    "workday": dtl.get("workday"),
+                    "calendarDay": dtl.get("calendarDay"),
+                    "applicationStatus": dtl.get("applicationStatus"),
+                    "lastUpdate": dtl.get("lastUpdate"),
+                    "updateDate": dtl.get("updateDate")        
+                }
+                rptDtlLst.append(rptDtl)
+            # added by Vincent Cheng on 11/23 
+            try:
+                if record["details"][0].get("year"):
+                    pass
+            except:            
+                return jsonify({"error_message" : "Sorry, we failed to generate Leave Summary.  Perhaps no data for the year"}), 501    
+                
+    
+            report = {
+                "hdrCalendarYear": record["details"][0].get("year"),
+                "hdrUser": record["details"][0].get("staffname") + "\nLeave Application Summary",
+                "hdrALTaken": alTaken,
+                "hdrALPending": alPending,
+                "hdrALBalance": alBalance,
+                "hdrSLTaken": slTaken,
+                "hdrSLPending": slPending,
+                "hdrCLTaken": clTaken,
+                "hdrCLPending": clPending,
+                "hdrCLBalance": clBalance,
+                "dtl": rptDtlLst
+                
+            }
+        #filename when using in Heroku:
+        fs = gridfs.GridFS(db)
+        wb = load_workbook(filename=BytesIO(fs.get(ObjectId(rpt["file"]["fileObj"])).read()))
+
+        # filename in development:
+        #wb = load_workbook(filename=rpt["file"]["fileName"])
+        ws = wb[rpt["file"]["wsName"]]
+        
+        result = genReport(ws, report, rpt)
+        if result[1] == 0:
+            out = BytesIO()
+            wb.save(out)
+            out.seek(0)        
+ 
+            wb.close()            
+            return out
+        else:            
+            return jsonify({"error_message" : "Sorry, we failed to generate Leave Summary.  Perhaps no data for the year"}), 501    
+
+
+def getApplicationForm(ref, racf):
+
+    # Get Staff record for output
+    StaffRecord = getStaffRecord(racf)
+
+    # Find leave list by racf and ref
+    ref_no = ref.replace(StaffRecord['staff']['hr_office'],"") # remove hr office in reference no
+    ref_no = ref_no.replace(StaffRecord['staff']['racf'][-3:],"") # remove staff racf in reference no
+
+    # Get leave balance 
+    getLeaveTypes()
+
+    approvalRecordLst = [ ]
+
+    for rec in StaffRecord['leave_record']:
+
+        #Select exact application by reference number
+        if rec['ref_no'] == int(ref_no):
+            leaveDetailsLst = [ ]
+            for details in rec["details"]:
+                # get rows for each leave application
+                leaveDetails = {
+                    "startDate": details["start_date"],
+                    "startTime": details["start_time"],
+                    "endDate": details["end_date"],
+                    "endTime": details["end_time"],
+                    "workday": details["no_of_workday"],
+                    "calendarDay": details["no_of_calendarday"]
+                    }
+                leaveDetailsLst.append(leaveDetails)
+
+                # Check the balance from Thomas function
+                displayLeaveHistoryHdr = [ ]
+                for lveType in leaveTypeLst:
+                    leaveTypeHdr = {
+                                    "leaveType": lveType.get("leave_type"),
+                                    "leaveTypeId": lveType.get("leave_type_id"),
+                                    "taken" : countLeave(rec['year'], lveType.get("leave_type_id"), df['gcStatusApproved'][0], StaffRecord),
+                                    "pending": countLeave(rec['year'], lveType.get("leave_type_id"), df['gcStatusPending'][0], StaffRecord),
+                                    "balance": checkBalance(rec['year'], lveType, StaffRecord, [])
+                                    }
+                    displayLeaveHistoryHdr.append(leaveTypeHdr)
+                
+            # Summarize the number of balance
+            if rec['type'] == 'LVE01':
+                DaysOfApproved = displayLeaveHistoryHdr[0]['taken']
+                DaysOfPending = displayLeaveHistoryHdr[0]['pending']
+                DaysOfleft = displayLeaveHistoryHdr[0]['balance']
+                DaysOfCarryForward = getYearCarryForward(rec['year'], StaffRecord)
+                DaysOfEntitlement = str(DaysOfCarryForward) + " (" + str(int(rec['year']-1)) + ") " + "+ " + str(getYearEntitlement(rec['year'], StaffRecord, rec['type'])) + " (" + str(int(rec['year'])) + ") "
+            elif rec['type'] == 'LVE02':
+                DaysOfApproved = displayLeaveHistoryHdr[1]['taken']
+                DaysOfPending = displayLeaveHistoryHdr[1]['pending']
+                DaysOfleft = displayLeaveHistoryHdr[1]['balance']
+                DaysOfCarryForward = 0
+                DaysOfEntitlement = str(getYearEntitlement(rec['year'], StaffRecord, rec['type'])) + " (" + str(int(rec['year'])) + ") "
+            else:
+                DaysOfApproved = "N/A"
+                DaysOfPending = "N/A"
+                DaysOfleft = "N/A"
+                DaysOfEntitlement = "N/A"
+
+            # Display Office Name
+            if StaffRecord['staff']['office'] == "HKG": str_officeHeader = "Hong Kong"
+            elif StaffRecord['staff']['office'] == "DEL": str_officeHeader = "India"
+            elif StaffRecord['staff']['office'] == "FLR": str_officeHeader = "Italy"
+            elif StaffRecord['staff']['office'] == "TPE": str_officeHeader = "Taiwan"
+
+            get_approver1 = ""
+            get_pos_approver1 = ""
+            get_approver2 = ""
+            get_pos_approver2 = ""
+            get_approver3 = ""
+            get_pos_approver3 = ""
+
+            if len(str(rec['approval']['approver1'])) > 0:
+                get_approver1 = getStaffRecord(rec['approval']['approver1'])['staff']['name']
+                get_pos_approver1 = getStaffRecord(rec['approval']['approver1'])['staff']['position']
+
+            if len(str(rec['approval']['approver2'])) > 0:
+                get_approver2 = getStaffRecord(rec['approval']['approver2'])['staff']['name']
+                get_pos_approver2 = getStaffRecord(rec['approval']['approver2'])['staff']['position']
+
+            if len(str(rec['approval']['approver3'])) > 0:
+                get_approver3 = getStaffRecord(rec['approval']['approver3'])['staff']['name']
+                get_pos_approver3 = getStaffRecord(rec['approval']['approver3'])['staff']['position']
+
+            if rec['sharePointId'] == "":
+                DissharePointid = ""
+            else:
+                DissharePointid = "(" + str(rec['sharePointId']) + ")"
+
+            try:
+                TakenApproved = int(DaysOfApproved + DaysOfPending)
+            except:
+                TakenApproved = "NA"
+
+            # Go back to build the structure for excel output file
+            # Array item label must be the same as MongoDB cell field in fileDrectory
+            leaveRecord = {
+                "staff": StaffRecord['staff']['name'],
+                "racf": racf,
+                "position": StaffRecord['staff']['position'],
+                "dept": StaffRecord['staff']['dept'],
+                "date_joined": StaffRecord['staff']['date_join'],
+                "ref_no": ref,
+                "sharePointid": DissharePointid,
+                "approver1": get_approver1,
+                "approver_pos1": get_pos_approver1,
+                "approval_date1": rec['approval']['approval_date1'],
+                "approver2": get_approver2,
+                "approver_pos2": get_pos_approver2,
+                "approval_date2": rec['approval']['approval_date2'],
+                "approver3": get_approver3,
+                "approver_pos3": get_pos_approver3,
+                "approval_date3": rec['approval']['approval_date3'],
+                "NoDaysEntitlement": DaysOfEntitlement ,
+                "NoDaysTakenApproved": str(TakenApproved) + " (" + str(DaysOfApproved) + " + "+ str(DaysOfPending) + ") ",
+                "NoDaysLeft": DaysOfleft,
+                "type_id": rec["type"],
+                "type": list(filter(lambda r: (r["leave_type_id"].upper() == rec["type"]), leaveTypeLst))[0].get("leave_type"),
+                "calendarYear": getDisplayLeaveYear(rec["year"]),
+                "officeHeader": str_officeHeader,
+                "submit_date": rec['submit_date'],
+                "details": leaveDetailsLst
+                }
+            
+            #Output to array to excel file
+            approvalRecordLst.append(leaveRecord)
+
+    # Get mapping from MongoDB
+    rpt = reportMap.find_one ( { "report": "Application Form"} )
+
+    #filename when using in Heroku:
+    fs = gridfs.GridFS(db)
+    wb = load_workbook(filename=BytesIO(fs.get(ObjectId(rpt["file"]["fileObj"])).read()))
+    ws = wb[rpt["file"]["wsName"]]
+
+    try:
+        genApplyForm(ws, approvalRecordLst, rpt)
+    except Exception as e:
+        print (e)
+        return jsonify({"error_message" : "Sorry, we failed to generate Application form"}), 501    
+
+    # Output 
+    out = BytesIO()
+    wb.save(out)
+    out.seek(0)
+
+    wb.close()            
+    print('sending file...')
+
+    return out
+
+
+
 def checkSSL(host,port,timeout=1):
     sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM) #presumably 
     sock.settimeout(timeout)
@@ -1071,8 +1340,7 @@ def checkSSL(host,port,timeout=1):
        return 250
 
 
-def Mailer_to_Go(message, title, sendTo, sendCC):
-
+def Mailer_to_Go(message, title, sendTo, sendCC, attachment = "", attachmentname = ""):
 
     # sender
     try: #Heroku
@@ -1145,6 +1413,20 @@ def Mailer_to_Go(message, title, sendTo, sendCC):
     recipient_email = list(recipient_email.split(";"))
     recipient_cc_email = list(recipient_cc_email.split(";"))
 
+    # Attachment Part
+    if len(attachment) > 0:
+        for index, bytesIOfile in enumerate(attachment):
+            try:
+                part3 = MIMEApplication(bytesIOfile.getvalue())
+                application_type = mimetypes.guess_type("a.xlsx")[0] or 'application/octet-stream' + " ;charset=UTF-8"
+                part3.add_header('Content-Disposition', 'attachment', filename=attachmentname[index])
+                part3.add_header('Content-Type', application_type)
+                message.attach(part3)
+            except:
+                pass
+    else:
+        pass
+
     try:
         host = current_app.mailertogo_host
         port = current_app.mailertogo_port
@@ -1205,7 +1487,10 @@ def sendEmail(psRecord, psRefNo, psApprovalStatus, psAction, psRequest, finalapp
         cc_sl_limit = str(psRecord["staff"]["cc_sl_limit"]).replace(",", ";")
         cc_sl_limit = cc_sl_limit.split(";")
         for index, recipient in enumerate(cc_sl_limit):
-            cc_sl_limit[index] = getStaffRecord(recipient.strip())['staff']["email"]
+            try:
+                cc_sl_limit[index] = getStaffRecord(recipient.strip())['staff']["email"]
+            except:
+                pass
         cc_sl_limit_list = ';'.join(map(str, cc_sl_limit))
     else:
         cc_sl_limit_list = ""
@@ -1241,20 +1526,22 @@ def sendEmail(psRecord, psRefNo, psApprovalStatus, psAction, psRequest, finalapp
     # Apply/Cancel leave must send to approver 1
     if ((psRequest == df['gcActionApply'][0] and psAction == df['gcActionApply'][0])):
         sendTo = getStaffRecord(psRecord["staff"]["approver1"])['staff']["email"]
-        sendCc = psRecord["staff"]["email"] + ";" + cc_general_list + ";" + cc_sl_limit_list
+        #sendCc = psRecord["staff"]["email"] + ";" + cc_general_list + ";" + cc_sl_limit_list
+        sendCc = ""
         title = "e-Leave alert : " + str(psRecord["staff"]["name"]) + " is requesting your APPROVAL to apply " + str(typename) + " (" + "Reference# : " + str(ref_no_hr) + ")"
         message = "Dear People Leader," + "\n" + "\n"  + "Please click the following link to approve:  https://mmgeleave.herokuapp.com/#/ApprovalCenter" + "\n" + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
         try:
-            Mailer_to_Go(message, title, sendTo, sendCc)
+            Mailer_to_Go(message, title, sendTo, sendCc,"","")
         except:
             pass
     elif (psRequest == df['gcActionCancel'][0]) and (psAction == df['gcActionCancel'][0]):
         sendTo = getStaffRecord(psRecord["staff"]["approver1"])['staff']["email"]
-        sendCc = psRecord["staff"]["email"] + ";" + cc_general_list + ";" + cc_sl_limit_list
+        #sendCc = psRecord["staff"]["email"] + ";" + cc_general_list + ";" + cc_sl_limit_list
+        sendCc = ""
         title = "e-Leave alert : " + str(psRecord["staff"]["name"]) + " is requesting your APPROVAL to cancel " + str(typename) + " (" + "Reference# : " + str(ref_no_hr) + ")"
         message = "Dear People Leader," + "\n" + "\n"  + "Please click the following link to approve:  https://mmgeleave.herokuapp.com/#/ApprovalCenter" + "\n" + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
         try:
-            Mailer_to_Go(message, title, sendTo, sendCc)
+            Mailer_to_Go(message, title, sendTo, sendCc,"","")
         except:
             pass        
     # Approved by approver must send to applicant and next approver , if it is final approver, it will send out the sick leave limit list to HR
@@ -1263,9 +1550,16 @@ def sendEmail(psRecord, psRefNo, psApprovalStatus, psAction, psRequest, finalapp
         if finalapprover == currentapprover:
             sendCc = current_approver + ";" + cc_general_list + ";" + cc_sl_limit_list
             title = "e-Leave alert : " + "Your leave application on " + str(typename) + " is updated with a status of Approved" + " (" + "Reference# : " + str(ref_no_hr) + ")"
-            message = "Dear Applicant, " + "\n" + "\n"  + "Approval Status :" + "\n" + Approval_Status  + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
+            if "SICK" in str(typename).upper() and int(sickleave_count) > 1:
+                message = "Dear Applicant, " + "\n" + "\n"  + "Approval Status :" + "\n" + Approval_Status  + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "*Reminder: the total number of sick leave consecutive day are " + str(sickleave_count) + " days" + "\n" + "\n"  + "Thanks," + "\n" + "e-Leave"
+            else:
+                message = "Dear Applicant, " + "\n" + "\n"  + "Approval Status :" + "\n" + Approval_Status  + "\n" + "Leave Period" + "\n" + leavePeriod + "\n"  + "\n"  + "Thanks," + "\n" + "e-Leave"
+            attached_list = [getApplicationForm(ref_no_hr,psRecord["staff"]["racf"])
+                            ]
+            filename_list = ["Leave Record for "+ ref_no_hr + " ("+ psRecord["staff"]["racf"] + ")" + ".xlsx"
+                            ]
             try:
-                Mailer_to_Go(message, title, sendTo, sendCc)
+                Mailer_to_Go(message, title, sendTo, sendCc, attached_list, filename_list)
             except:
                 pass
         elif finalapprover > currentapprover:
@@ -1273,7 +1567,7 @@ def sendEmail(psRecord, psRefNo, psApprovalStatus, psAction, psRequest, finalapp
             title = "e-Leave alert : " + "Your leave application on " + str(typename) + " is updated with a status of Pending for Approval" + " (" + "Reference# : " + str(ref_no_hr) + ")"
             message = "Dear Applicant, " + "\n" + "\n"  + "Approval Status :" + "\n" + Approval_Status + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
             try:
-                Mailer_to_Go(message, title, sendTo, sendCc)
+                Mailer_to_Go(message, title, sendTo, sendCc,"","")
             except:
                 pass
     # Reject end instantly
@@ -1283,7 +1577,7 @@ def sendEmail(psRecord, psRefNo, psApprovalStatus, psAction, psRequest, finalapp
         title = "e-Leave alert : " + "Your leave application on " + str(typename) + " is updated with a status of Rejected" + " (" + "Reference# : " + str(ref_no_hr) + ")"
         message = "Dear Applicant, " + "\n" + "\n"  + "Approval Status :" + "\n" + Approval_Status + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
         try:
-            Mailer_to_Go(message, title, sendTo, sendCc)
+            Mailer_to_Go(message, title, sendTo, sendCc,"","")
         except:
             pass 
     # Approved by approver must send to applicant and next approver , if it is final approver, it will send out the sick leave limit list to HR
@@ -1293,8 +1587,12 @@ def sendEmail(psRecord, psRefNo, psApprovalStatus, psAction, psRequest, finalapp
             sendCc = current_approver + ";" + cc_general_list + ";" + cc_sl_limit_list
             title = "e-Leave alert : " + "Your leave application on " + str(typename) + " is updated with a status of Cancelled" + " (" + "Reference# : " + str(ref_no_hr) + ")"
             message = "Dear Applicant, " + "\n" + "\n"  + "Cancel Approval Status :" + "\n" + Approval_Status + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
+            attached_list = [getApplicationForm(ref_no_hr,psRecord["staff"]["racf"])
+                            ]
+            filename_list = ["Leave Record for "+ ref_no_hr + " ("+ psRecord["staff"]["racf"] + ")" + ".xlsx"
+                            ]
             try:
-                Mailer_to_Go(message, title, sendTo, sendCc)
+                Mailer_to_Go(message, title, sendTo, sendCc, attached_list, filename_list)
             except:
                 pass
         elif finalapprover > currentapprover:
@@ -1302,27 +1600,27 @@ def sendEmail(psRecord, psRefNo, psApprovalStatus, psAction, psRequest, finalapp
             title = "e-Leave alert : " + "Your leave application on " + str(typename) + " is updated with a status of Pending for Approval" + " (" + "Reference# : " + str(ref_no_hr) + ")"
             message = "Dear Applicant, " + "\n" + "\n"  + "Cancel Approval Status :" + "\n" + Approval_Status + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
             try:
-                Mailer_to_Go(message, title, sendTo, sendCc)
+                Mailer_to_Go(message, title, sendTo, sendCc,"","")
             except:
                 pass
-    # Send pending leave to next approver
+    # Send pending leave to next approver (Cancel)
     if (finalapprover > currentapprover) and (psAction == df['gcActionApprove'][0] and psRequest == df['gcActionCancel'][0]):
         sendTo = next_approver
         sendCc = psRecord["staff"]["email"] + ";" + cc_general_list + ";" + cc_sl_limit_list
         title = "e-Leave alert : " + str(psRecord["staff"]["name"]) + " is requesting your APPROVAL to cancel " + str(typename) + " (" + "Reference# : " + str(ref_no_hr) + ")"
         message = "Dear People Leader," + "\n" + "\n"  + "Please click the following link to approve:  https://mmgeleave.herokuapp.com/#/ApprovalCenter" + "\n" + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
         try:
-            Mailer_to_Go(message, title, sendTo, sendCc)
+            Mailer_to_Go(message, title, sendTo, sendCc,"","")
         except:
             pass
-    # Send pending leave to next approver
+    # Send pending leave to next approver (Apply)
     if (finalapprover > currentapprover) and (psAction == df['gcActionApprove'][0] and psRequest == df['gcActionApply'][0]):
         sendTo = next_approver
         sendCc = psRecord["staff"]["email"]
         title = "e-Leave alert : " + str(psRecord["staff"]["name"]) + " is requesting your APPROVAL to apply " + str(typename) + " (" + "Reference# : " + str(ref_no_hr) + ")"
         message = "Dear People Leader," + "\n" + "\n"  + "Please click the following link to approve:  https://mmgeleave.herokuapp.com/#/ApprovalCenter" + "\n" + "\n" + "Leave Period" + "\n" + leavePeriod + "\n" + "Thanks," + "\n" + "e-Leave"
         try:
-            Mailer_to_Go(message, title, sendTo, sendCc)
+            Mailer_to_Go(message, title, sendTo, sendCc,"","")
         except:
             pass
 
@@ -2038,7 +2336,6 @@ def apiPrintSummary():
                     "refNo": dtl.get("refNo"),
                     "office": dtl.get("office"),
                     "staffname": dtl.get("staffname"),
-                    "empID": dtl.get("empID"),
                     "dept": dtl.get("dept"),
                     "type": dtl.get("type"),
                     "year": dtl.get("year"),
@@ -2092,7 +2389,7 @@ def apiPrintSummary():
             #wb.save(filename="F:\mmgapp\dev\eleave\output\LeaveSummary.xlsx")
             wb.close()            
             print('sending file...')
-            return send_file(out,  attachment_filename='a_file.xls', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')            
+            return send_file(out,  attachment_filename='a_file.xls', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')      
         else:            
             return jsonify({"error_message" : "Sorry, we failed to generate Leave Summary.  Perhaps no data for the year"}), 501    
         
@@ -2325,8 +2622,13 @@ def listPartnersLeave(psInput):
                                 partnersLeaveList.append(leaveRecord)
                     partnersLeaveList = sorted(partnersLeaveList, key=lambda d: (d["approvalStatus"], d["staff"], d["racf"], d["ref_no"])) 
             partnersLeave.append(partnersLeaveList)
-    #print (partnersLeaveList)
-    return ({"pass": True, "error_message" : None, "result": partnersLeave, "Status_code": 200}) 
+
+    # Re-structure
+    final_result = [ ]
+    for index, rec in enumerate(partnersLeave[0]):
+        final_result.append(rec)
+
+    return ({"pass": True, "error_message" : None, "result": final_result, "Status_code": 200}) 
 
 # Status_code 200: passed
 # Status_code 504: failed, Staff Record Not Exist
@@ -2417,4 +2719,3 @@ def apiChangeStatus():
         return jsonify(result), result['Status_code'] # APP
     except:
         return jsonify(result) # postman
- 
